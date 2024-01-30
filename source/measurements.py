@@ -3,14 +3,10 @@
 
 """
 @author:https://github.com/fsfetcu
+
+Inspiratation from https://github.com//chris-galland/qutip-odmr
 """
 
-# TODO
-#--------------------------------------------------------------------------------
-# Update the docstrings
-# Implement linewidth function based on experimental setup
-# implement baseline and drop in PL count based on experimental setup
-#--------------------------------------------------------------------------------
 
 import numpy as np
 from hamiltonian import singleNVhamiltonian as snvh
@@ -26,7 +22,7 @@ from qutip.operators import sigmaz, destroy,sigmax, sigmay,sigmam, sigmap
 from qutip.qip.operations import snot
 from qutip.states import basis
 
-from alive_progress import alive_it
+from alive_progress import alive_it # Not needed, just visual
 from alive_progress import alive_bar
 class cwODMR:
     
@@ -135,24 +131,6 @@ class cwODMR:
     def ODMRsingleNV_lock_in(MWfreq, MWvec, Bvec, Evec, Linewidth):
         """
         Returns ESR lock-in transition strengths for a single NV center.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float   
-            Linewidth of the transition (depends on experimental setup).
-        
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths for Locking odmr.
         """
 
         nMW = len(MWfreq)  
@@ -184,24 +162,6 @@ class cwODMR:
     def nvODMR_lock_in(MWfreq, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
         """
         Returns ESR lock-in transition strengths for a NV ensemble.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths for Locking odmr.
         """
         nMW = len(MWfreq)  
         Tstrength = np.zeros(nMW)  
@@ -221,24 +181,6 @@ class cwODMR:
     def noisy_nvODMR_lock_in(MWfreq, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
         """
         Returns ESR lock-in transition strengths for a NV ensemble with noise.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths for Locking odmr.
         """
         nMW = len(MWfreq)  
         Tstrength = np.zeros(nMW)  
@@ -290,10 +232,6 @@ class pulsedODMR:
         
         nMW = len(MWfreq)  # Number of microwave frequency points
         Tstrength = np.zeros(nMW)  # Transition strength
-        SX = tensor(snvh.S_x,snvh.SI)
-        # Eigenenergies and eigenvectors
-
-        operator = (-1j * np.pi * SX).expm()
 
         eigenenergies, eigenstates = snvh.NV_eigenEnergiesStates(Bvec, Evec)
         H_free = snvh.free_hamiltonian(Bvec, Evec)
@@ -319,14 +257,11 @@ class pulsedODMR:
         freq_list2 = [eigenenergies[1] - eigenenergies[i] for i in [3,4,5,6,7,8]]
         freq_list3 = [eigenenergies[2] - eigenenergies[i] for i in [3,4,5,6,7,8]]        
 
-
-        
-
-        for i in [3,4,5,6,7,8]:#range(len(eigenstates)):  # Sweep over all initial states
+        for i in [3,4,5,6,7,8]:#range(len(eigenstates)):  # transition states
             freq_i = eigenenergies[i]
             psi_i = eigenstates[i]
             # Calculate transition strengths
-            for j in [0,1,2]:#range(len(eigenstates)):  
+            for j in [0,1,2]: # initial states 
                 freq_j = eigenenergies[j]  
                 psi_j = eigenstates[j]  
                 
@@ -347,29 +282,14 @@ class pulsedODMR:
         
 
     def NoisypulsedODMRsingleNV(MWfreq, MWvec, Bvec, Evec, Linewidth):
+        """
+        Returns pulsed ESR transition strengths for a single NV center with noise.
+        """
         return pulsedODMR.pulsedODMRsingleNV(MWfreq, MWvec, Bvec, Evec, Linewidth) + noise.NoiseOf(pulsedODMR.pulsedODMRsingleNV(MWfreq, MWvec, Bvec, Evec, Linewidth), 'gaussian', 0.02)
     @staticmethod
     def pulsednvODMR(MWfreq, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
         """
         Calculates pulsed ESR transition strengths for an NV ensemble.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-        
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths.
         """
         nMW = len(MWfreq)  
         Tstrength = np.zeros(nMW)  
@@ -389,24 +309,6 @@ class pulsedODMR:
     def noisy_pulsednvODMR(MWfreq, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
         """
         Calculates pulsed ESR transition strengths for an NV ensemble with noise.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-        
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths.
         """
         nMW = len(MWfreq)  
         Tstrength = np.zeros(nMW)  
@@ -422,179 +324,40 @@ class pulsedODMR:
         n_NV = len(Bvector_list)
         return Tstrength / n_NV
 
-    @staticmethod
-    def pulsedODMRsingleNV_lock_in(MWfreq, MWvec, Bvec, Evec, Linewidth):
-        """
-        Calculates the pulsed ESR lock-in transition strengths for a single NV center using pulsed ESR.
-        This is equivalent to a Pi pulse on the transition of interest (2.87 GHz, |g, ms=0> to |g, ms= +-1>)
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths.
-        """
+    # @staticmethod
+    # def ram(Linewidth,Bvec,Evec):
         
-        # Pi pulse duration
-        pi_pulse_duration = np.pi / (2.87e9)
 
-        nMW = len(MWfreq)
-        Tstrength = np.zeros(nMW)
+    #     T2 = 1 / (np.pi * Linewidth)  # T2 is in microseconds
+    #     # Eigenenergies and eigenvectors
+    #     #simple hamiltonian
+    #     H_free = snvh.simpleFree(Bvec, Evec)
+        
+    #     eigenenergies, eigenstates = snvh.simpleHamiltonEigen(Bvec, Evec)
 
-        # Eigenenergies and eigenvectors
-        eigenenergies, eigenstates = snvh.NV_eigenEnergiesStates(Bvec, Evec)
-        Hint = snvh.GShamiltonianMWint(MWvec)
-
-        # Define the time-dependent coefficient function for the pulse
-        def pulse_coeff(t, args):
-            return 1 if 0 <= t <= pi_pulse_duration else 0
-
-        for idx, mw_freq in enumerate(MWfreq):
-            H_pulse = [Hint, pulse_coeff]
-
-            # Initial state
-            psi0 = tensor(basis(3, 0), basis(3, 0))
-
-            # Time-dependent Schrödinger equation during the π pulse
-            result = mesolve(H_pulse, psi0, np.linspace(0, pi_pulse_duration, 100), [], [])
-
-            # Final state
-            psi_end = result.states[-1]
-
-            # Calculate transition strengths
-            for j in range(len(eigenstates)):
-                freq_j = eigenenergies[j]
-                psi_j = eigenstates[j]
-
-                # Matrix element of the transition <j|Hint|i> = <j|psi_end>
-                TME = (psi_j.dag() * psi_end).data.toarray()[0,0]
-                TA = np.abs(TME)**2
-
-                TS = TA * math_functions.dispersive_lorentzian(mw_freq, np.abs(freq_j - eigenenergies[0]), Linewidth)
-                Tstrength[idx] += TS
+    #     def choose_transition(a,b):
+    #         """
+    #         Qubit frequency between two states. 
+    #         """
+    #         resonant = np.abs(eigenenergies[a] - eigenenergies[b])
+    #         return resonant
             
-        return Tstrength
+    #     resonant = choose_transition(1,0)
+    #     a = destroy(2)
+    #     print(a)
+    #     Hadamard = snot()
+    #     states = Qobj(H_free[1:3, 1:3]).eigenstates()
+    #     plus_state = (basis(2,1) - basis(2,0)).unit()
+    #     tlist = np.linspace(0.00, 0.2,1000)
+    #     # T2 = 5
+    #     processor = Processor(1, t2=T2)
+    #     processor.add_control(sigmaz()*resonant/2)
+    #     processor.pulses[0].coeff = np.ones(len(tlist))
+    #     processor.pulses[0].tlist = tlist
+    #     result = processor.run_state(
+    #         plus_state,analytical = False,noisy = True, solver = 'mesolve', e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard])
 
-    @staticmethod
-    def pulsednvODMR_lock_in(MWfreq, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
-        """
-        Calculates pulsed ESR lock-in transition strengths for an NV ensemble.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-        
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths.
-        """
-        nMW = len(MWfreq)  
-        Tstrength = np.zeros(nMW)  
-
-        Bvector_list = vec.getAllframesCartesian(B0, thetaB, phiB)
-        Evector_list = vec.getAllframesCartesian(E0, thetaE, phiE)
-        MWvector_list = vec.getAllframesCartesian(1, thetaMW, phiMW)
-
-        for MWvec, Bvec, Evec in zip(MWvector_list, Bvector_list, Evector_list):
-            Tstrength += pulsedODMR.pulsedODMRsingleNV_lock_in(MWfreq, MWvec, Bvec, Evec, Linewidth)
-
-        n_NV = len(Bvector_list)
-
-        return Tstrength / n_NV
-
-    @staticmethod
-    def noisy_pulsednvODMR_lock_in(MWfreq, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
-        """
-        Calculates pulsed ESR lock-in transition strengths for an NV ensemble with noise.
-
-        Parameters
-        ----------
-        MWfreq : numpy.ndarray
-            Array of frequencies.
-        MWvec : qt.Qobj
-            Vector of the microwave field defined in NV frame.
-        Bvec : qt.Qobj
-            Vector of the magnetic field defined in NV frame.
-        Evec : qt.Qobj
-            Vector of the electric field defined in NV frame.
-        Linewidth : float
-            Linewidth of the transition (depends on experimental setup).
-        
-        Returns
-        -------
-        numpy.ndarray
-            Transition strengths.
-        """
-        nMW = len(MWfreq)  
-        Tstrength = np.zeros(nMW)  
-
-        Bvector_list = vec.getAllframesCartesian(B0, thetaB, phiB)
-        Evector_list = vec.getAllframesCartesian(E0, thetaE, phiE)
-        MWvector_list = vec.getAllframesCartesian(1, thetaMW, phiMW)
-
-        for MWvec, Bvec, Evec in zip(MWvector_list, Bvector_list, Evector_list):
-            Tstrength = Tstrength + pulsedODMR.pulsedODMRsingleNV_lock_in(MWfreq, MWvec, Bvec, Evec, Linewidth) \
-                                 + noise.NoiseOf(Tstrength, 'gaussian', 0.02)
-
-        n_NV = len(Bvector_list)
-        return Tstrength / n_NV
-
-    @staticmethod
-    def ram(Linewidth,Bvec,Evec):
-        
-
-        T2 = 1 / (np.pi * Linewidth)  # T2 is in microseconds
-        # Eigenenergies and eigenvectors
-        #simple hamiltonian
-        H_free = snvh.simpleFree(Bvec, Evec)
-        
-        eigenenergies, eigenstates = snvh.simpleHamiltonEigen(Bvec, Evec)
-
-        def choose_transition(a,b):
-            """
-            Qubit frequency between two states. 
-            """
-            resonant = np.abs(eigenenergies[a] - eigenenergies[b])
-            return resonant
-            
-        resonant = choose_transition(1,0)
-        a = destroy(2)
-        print(a)
-        Hadamard = snot()
-        states = Qobj(H_free[1:3, 1:3]).eigenstates()
-        plus_state = (basis(2,1) - basis(2,0)).unit()
-        tlist = np.linspace(0.00, 0.2,1000)
-        # T2 = 5
-        processor = Processor(1, t2=T2)
-        processor.add_control(sigmaz()*resonant/2)
-        processor.pulses[0].coeff = np.ones(len(tlist))
-        processor.pulses[0].tlist = tlist
-        result = processor.run_state(
-            plus_state,analytical = False,noisy = True, solver = 'mesolve', e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard])
-
-        return tlist , result.expect, T2
+    #     return tlist , result.expect, T2
 
 
     @staticmethod
