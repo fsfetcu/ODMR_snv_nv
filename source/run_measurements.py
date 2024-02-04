@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-File to run simulations.
+File to run NV simulations.
 """
 
 
@@ -14,15 +14,15 @@ from vectors import vec
 import matplotlib.pyplot as plt
 
 #constants
-MW_freq_range = np.linspace(2850,2890, 1000)  # Adjust range and points as needed
-B0 = 0 # Magnetic field strength in G
-thetaB, phiB = np.pi, np.pi  # Direction of the magnetic field in spherical coordinates
-E0 = 1e7  # Electric field strength (assuming no electric field for simplicity)
+MW_freq_range = np.linspace(2820, 2920, 1000)  # Adjust range and points as needed
+B0 = 10 # Magnetic field strength in G
+thetaB, phiB = np.pi, np.pi/2  # Direction of the magnetic field in spherical coordinates
+E0 = 0  # Electric field strength (assuming no electric field for simplicity)
 thetaE, phiE = np.pi/4, np.pi/2  # Direction of the electric field (not relevant here)
 
 # Define MW field parameters (assuming it's perpendicular to the NV axis)
 thetaMW, phiMW = 0, np.pi/2 # Direction of MW field
-Linewidth = 1 # Linewidth of the transitions (in MHz)
+Linewidth = 2.5 # Linewidth of the transitions (in MHz)
 
 Bvec = vec.getAllframesCartesian(B0, thetaB, phiB)[0]
 Evec = vec.getAllframesCartesian(E0, thetaE, phiE)[0]
@@ -34,16 +34,15 @@ pulsed_odmrDATA = pulsedODMR.pulsedODMRsingleNV(MW_freq_range,MWvec, Bvec, Evec,
 
 simulation = [cw_odmrDATA, pulsed_odmrDATA]#, nvODMR_lock_inDATA, pulsed_odmr_lock_inDATA]
 # plotting.plot_ODMR(MW_freq_range, simulation)
-
+l = ["cw", "pulsed"]
 plt.figure()
 plt.rcParams.update({'font.size': 22})
 plt.style.use("classic")
 for idx,data in enumerate(simulation):
-    data = data/np.max(data)
+    data = data/max(data)
     fluoresence = 1 - (data) 
-    plt.plot(MW_freq_range, fluoresence)#, label = f"{l[idx]}")
-    
-
+    plt.plot(MW_freq_range, fluoresence, label = f"{l[idx]}")
+plt.legend()
 plt.xlabel('Microwave frequency (MHz)')
 plt.ylabel('Fluoresence (a.u.)')
 plt.grid(False)

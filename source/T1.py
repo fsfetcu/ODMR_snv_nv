@@ -1,114 +1,109 @@
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from qutip import *
-
-# # Constants
-# max_tau = 20
-# min_T1 = 0.2
-# max_T1 = 50
-# resonant = 2870
-# tau_values = np.linspace(0, max_tau, 400)  # Time delays after the pi pulse
-# T1_values = np.linspace(min_T1, max_T1, 100)  # Different T1 relaxation times
-
-# # Results matrix
-# results_matrix = np.zeros((len(T1_values), len(tau_values)))
-
-# for i, T1 in enumerate(T1_values):
-#     H_free = sigmaz() * resonant / 2  # Free Hamiltonian
-#     excited_state = basis(2, 1)  # Start in the excited state |1>
-#     e_ops = [excited_state * excited_state.dag()]  # Measure the population of the excited state
-#     c_ops = [sigmax() * np.sqrt(1/(T1))]  # Collapse operator for T1 relaxation
-
-#     # Solve the master equation for each T1 and tau
-#     result = mesolve(H_free, excited_state, tau_values, c_ops=c_ops, e_ops=e_ops)
-#     results_matrix[i, :] = result.expect[0]  # Store the population of |1>
-
-# # Plotting
-# plt.figure(figsize=(8, 6))
-# # Plot the population of the excited state |1> as a function of tau and T1
-# plt.imshow(results_matrix, extent=[tau_values.min(), tau_values.max(), T1_values.min(), T1_values.max()], aspect='auto', origin='lower')
-# plt.colorbar(label='Population of State |1>')
-# plt.xlabel('$\\tau$')
-# plt.yscale('linear')
-# plt.ylabel('$T_1$')
-# plt.show()
-
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from qutip import *
-
-# # Constants
-# max_tau = 20
-# T1 = 10  # Specific T1 value for the simulation
-# resonant = 2870
-# tau_values = np.linspace(0, max_tau, 400)  # Time delays after the pi pulse
-
-# # Results matrix for T1 = 10
-# results = np.zeros(len(tau_values))
-
-# H_free = sigmaz() * resonant / 2  # Free Hamiltonian
-# excited_state = basis(2, 1)  # Start in the excited state |1>
-# e_ops = [excited_state * excited_state.dag()]  # Measure the population of the excited state
-# c_ops = [sigmax() * np.sqrt(1/(T1))]  # Collapse operator for T1 relaxation, should be sigmam()
-
-# # Solve the master equation for T1 = 10 and each tau
-# result = mesolve(H_free, excited_state, tau_values, c_ops=c_ops, e_ops=e_ops)
-# results = result.expect[0]  # Store the population of |1>
-
-# # Plotting the decay curve
-# plt.figure(figsize=(8, 6))
-# plt.style.use("classic")
-# plt.plot(tau_values, results, label='Population of State |1>')
-# plt.xlabel('Tau (Time after pi pulse)')
-# plt.ylabel('Population of State |1>')
-# plt.title(f'T1 Relaxation for T1 = {T1}')
-# plt.legend()
-# plt.show()
-
 import numpy as np
+from utils import plotting, math_functions
+from measurements import cwODMR, pulsedODMR
 import matplotlib.pyplot as plt
-from qutip import *
-from matplotlib.cm import viridis
-from matplotlib.colors import Normalize
+from vectors import vec
+from scipy.optimize import curve_fit
+from scipy.signal import find_peaks
+#constants
+MW_freq_range = np.linspace(2840, 2900, 500)  # Adjust range and points as needed
+B0 = 0# Magnetic field strength in G
+thetaB, phiB = np.pi / 2, 0  # Direction of the magnetic field in spherical coordinates
+E0 = 0 # Electric field strength (assuming no electric field for simplicity)
+thetaE, phiE = np.pi / 2, 0   # Direction of the electric field (not relevant here)
 
-# Constants
-max_tau = 20
-min_T1 = 0.2
-max_T1 = 50
-resonant = 2870
-tau_values = np.linspace(0, max_tau, 400)  # Time delays after the pi pulse
-T1_values = np.linspace(min_T1, max_T1, 3000)  # Different T1 relaxation times
-num_T1 = len(T1_values)
+# Define MW field parameters (assuming it's perpendicular to the NV axis)
+thetaMW, phiMW = np.pi/2 , 0  # Direction of MW field
+Linewidth = 0.5  # Linewidth of the transitions (in MHz)
 
-# Results matrix
-results_matrix = np.zeros((num_T1, len(tau_values)))
+data = []
 
-for i, T1 in enumerate(T1_values):
-    H_free = sigmaz() * resonant / 2  # Free Hamiltonian
-    excited_state = basis(2, 1)  # Start in the excited state |1>
-    e_ops = [excited_state * excited_state.dag()]  # Measure the population of the excited state
-    c_ops = [sigmax() * np.sqrt(1/T1)]  # Collapse operator for T1 relaxation
-    result = mesolve(H_free, excited_state, tau_values, c_ops=c_ops, e_ops=e_ops)
-    results_matrix[i, :] = result.expect[0]  # Store the population of |1>
+MWvec_x = [1, 0, 0]
 
-# Plotting
-fig, ax = plt.subplots(figsize=(8, 6))
+# Linear polarization along y-axis
+MWvec_y = [0, 1, 0]
 
-# Create a color map
-norm = Normalize(min_T1, max_T1)
-colors = viridis(norm(T1_values))
+# Right circular polarization (in xy-plane)
+MWvec_rcp = [1/np.sqrt(2), 1j/np.sqrt(2), 0]
 
-# Plot each T1 slice with the corresponding color
-for i in range(num_T1):
-    ax.plot(tau_values, results_matrix[i, :], color=colors[i], lw=2)
+# Left circular polarization (in xy-plane)
+MWvec_lcp = [1/np.sqrt(2), -1j/np.sqrt(2), 0]
 
-# Creating a colorbar with the T1 label
-sm = plt.cm.ScalarMappable(cmap=viridis, norm=norm)
-sm.set_array([])  # Only needed for older versions of matplotlib
-cbar = fig.colorbar(sm, ax=ax, ticks=np.linspace(min_T1, max_T1, 10))
-cbar.set_label('$T_1$')
+MWvec = [MWvec_x, MWvec_y, MWvec_rcp, MWvec_lcp]
+Bvec = vec.getAllframesCartesian(B0, thetaB, phiB)[0]
+Evec = vec.getAllframesCartesian(E0, thetaE, phiE)[0]
 
-ax.set_xlabel('$\\tau$ ')
-ax.set_ylabel('Population of state $|1\\rangle$')
+# Define the range of free precession times
 
+
+
+# fluorescence_signal_normalized = fluorescence_signal / max(fluorescence_signal)
+
+# # Plotting the normalized fluorescence signal
+# plt.plot(tau_range, fluorescence_signal, 'o', color='blue', markersize=3)
+# plt.xlabel('Free Precession Time (s)')
+# plt.ylabel('Fluorescence Intensity (Arbitrary Units)')
+# plt.title('Simulated Ramsey Fringes')
+# plt.show()
+
+# fluorescence_signal = pulsedODMR.ramsey_spectroscopy(tau_range, MWvec[3],Bvec, Evec, Linewidth)
+# # Bvec = vec.getAllframesCartesian(100, thetaB, phiB)[0]
+# # fluorescence_signal2 = pulsedODMR.ramsey_spectroscopy(tau_range, MWvec[3],Bvec, Evec, Linewidth)
+# # data = [fluorescence_signal, fluorescence_signal2]
+# plotting.plot_ramsey(tau_range, [fluorescence_signal])   
+
+def exp_decay(x, a, b, c):
+    return a*np.exp(-x/b) + c
+t_points = 150
+tau_range = np.linspace(1e-9,100,t_points)#np.arange(1e-6, 0.2, 1/2870)  # Up to one period of the Rabi oscillation
+T1 = np.linspace(1,40,200)
+tlist , result, T2 = pulsedODMR.relaxation(tau_range,MWvec[3],Bvec,Evec,Linewidth,t_points)#(tau_range,MWvec[3],Bvec, Evec, Linewidth)
+
+probabilities = result[0]
+
+# Normalize probabilities
+probabilities /= probabilities.max()
+
+
+# # Assuming `tau_range` is your array of time points and `probabilities` is your oscillation data
+# peaks, _ = find_peaks(probabilities,prominence=0.01)
+# peak_times = tau_range[peaks]
+# peak_values = probabilities[peaks]
+
+# # # Fit the exponential decay to the peaks
+# # params, _ = curve_fit(exp_decay, peak_times, peak_values, p0=[1, 1/(np.pi*Linewidth), 0.5])
+# # print("T2 = ", params[1])
+# # # Generate the envelope using the fitted parameters
+# # envelope = exp_decay(tau_range, *params)
+
+# # peaks, _ = find_peaks(result[1],prominence=0.01)
+# # peak_times = tau_range[peaks]
+# # peak_values = result[1][peaks]
+
+# # Fit the exponential decay to the peaks
+# params, _ = curve_fit(exp_decay, peak_times, peak_values,p0=[1, T2, 0.5])
+
+# # Generate the envelope using the fitted parameters
+# envelope1 = exp_decay(tau_range, *params)
+
+
+# print("T2* = ",params[1])
+
+
+T2 = 1/(np.pi*Linewidth)
+plt.figure()
+plt.style.use("classic")
+# plt.plot(tlist[:-1], result[1][:-1], '-', linewidth = 3, label="Ramsey signal") # result[1][:-1]
+# plt.plot(tlist[:-1], (np.exp(-1./T2*tlist[:-1]))*0.5 + 0.5, color = "r",label="Exponential envelope (Ramsey)")
+# plt.plot(tlist[:-1], -np.exp(-1./T2*tlist[:-1])*0.5 +0.5, color = "r")
+# plt.plot(tau_range, probabilities, 'o-',linewidth = 1, label='Hahn Echo')
+# plt.plot(tau_range, envelope, 'y-', label='Exponential envelope (Hahn)')
+plt.plot(tau_range, probabilities, 'o-',linewidth = 2, label='T1 relaxation')
+# plt.plot(tau_range, envelope1, 'r-', label='Exponential envelope (Ramsey)')
+plt.ylim(0,1.1)
+plt.xscale('linear')
+plt.xlabel('Free evolution time $\\tau$ ($\\mu s$)')
+plt.ylabel('Population of |$m_s = -1\\rangle$')
+plt.legend()
 plt.show()
+

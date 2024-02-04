@@ -60,7 +60,7 @@ def oned():
     # Calculate qubit frequency for each (phi, theta)
     for i, phi in enumerate(phi_values):
         # Convert spherical to Cartesian coordinates
-        B = vec.getAllframesCartesian(B_magnitude, 0.5, phi)[0]
+        B = vec.getAllframesCartesian(B_magnitude, np.pi/2, phi)[0]
 
         # Calculate eigenenergies
         E_I, _ = SingleSnVHamiltonian.SNV_eigenEnergiesStates(B)
@@ -72,9 +72,9 @@ def oned():
     # Create the 2D plot
     plt.figure(figsize=(8, 6))
     plt.style.use("classic")
-    plt.plot(phi_values, qubit_freqs)
-    plt.xlabel('$\\phi$ (rad)')
-    plt.ylabel('Qubit Frequency (Hz)')
+    plt.plot(phi_values, qubit_freqs/1e9)
+    plt.xlabel('$\\phi_B$ (rad)')
+    plt.ylabel('Qubit Frequency (GHz)')
     plt.show()
 
 def bd():

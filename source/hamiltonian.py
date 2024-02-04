@@ -275,7 +275,10 @@ class SingleSnVHamiltonian:
 
     Upsilon_x = 50e9/(2*np.pi)
     Upsilon_y = np.sqrt(177e9**2 - Upsilon_x**2)/(2*np.pi)
-    delta_g = 0
+    delta_g = 0.014
+    f_g = 0.154
+
+    
     @staticmethod
     def H_SO():
         """
@@ -300,6 +303,11 @@ class SingleSnVHamiltonian:
         Bx, By, Bz = B
         H_zeeman = SingleSnVHamiltonian.gamma_e * (Bx * sigmax() + By * sigmay() + (1+2*SingleSnVHamiltonian.delta_g)*Bz * sigmaz())
         return tensor(SingleSnVHamiltonian.I,H_zeeman)
+    @staticmethod
+    def H_L(B):
+        Bx, By, Bz = B
+        H_L = -0.5*SingleSnVHamiltonian.f_g*SingleSnVHamiltonian.gamma_e * (Bz * sigmay())
+        return tensor(H_L, SingleSnVHamiltonian.I)
     @staticmethod
     def H_JT(Upsilon_x, Upsilon_y):
         """
@@ -326,7 +334,7 @@ class SingleSnVHamiltonian:
         Returns:
             Qobj: Total Hamiltonian.
         """
-        return SingleSnVHamiltonian.H_SO() + SingleSnVHamiltonian.H_Z(B) + SingleSnVHamiltonian.H_JT(SingleSnVHamiltonian.Upsilon_x,SingleSnVHamiltonian.Upsilon_y)
+        return SingleSnVHamiltonian.H_SO() + SingleSnVHamiltonian.H_Z(B) + SingleSnVHamiltonian.H_JT(SingleSnVHamiltonian.Upsilon_x,SingleSnVHamiltonian.Upsilon_y) + SingleSnVHamiltonian.H_L(B)
     
     def SNV_eigenEnergiesStates(B):
         H_total = SingleSnVHamiltonian.H_total(B)
@@ -351,6 +359,8 @@ class SingleSnVHamiltonian:
             Interaction Hamiltonian.
         """
         # Magnetic field coupling terms
-        HintEl = SingleSnVHamiltonian.H_Z(Bmw)
+        Bx, By, Bz = Bmw
+        H_zeeman = SingleSnVHamiltonian.gamma_e * (Bx * sigmax() + By * sigmay() + Bz * sigmaz())
+        return tensor(SingleSnVHamiltonian.I,H_zeeman)
         return HintEl
 

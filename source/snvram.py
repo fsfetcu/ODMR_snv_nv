@@ -7,14 +7,14 @@ from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 #constants
 MW_freq_range = np.linspace(2840, 2900, 500)  # Adjust range and points as needed
-B0 = 0.00001# Magnetic field strength in G
-thetaB, phiB = np.pi / 2, 0  # Direction of the magnetic field in spherical coordinates
+B0 = 0.01# Magnetic field strength in T
+thetaB, phiB = np.pi, np.pi  # Direction of the magnetic field in spherical coordinates
 E0 = 0 # Electric field strength (assuming no electric field for simplicity)
 thetaE, phiE = np.pi / 2, 0   # Direction of the electric field (not relevant here)
 
 # Define MW field parameters (assuming it's perpendicular to the NV axis)
 thetaMW, phiMW = np.pi/2 , 0  # Direction of MW field
-Linewidth = 50  # Linewidth of the transitions (in MHz)
+Linewidth = 5e6  # Linewidth of the transitions (in MHz)
 
 data = []
 
@@ -54,23 +54,23 @@ MWvec = vec.getAllframesCartesian(1, thetaMW, phiMW)[0]
 
 def exp_decay(x, a, b, c):
     return a*np.exp(-x/b) + c
-
-tau_range = np.linspace(1e-10,0.01,50)#np.arange(1e-6, 0.2, 1/2870)  # Up to one period of the Rabi oscillation
+t_points = 100
+tau_range = np.linspace(1e-15,300e-9,t_points)#np.arange(1e-6, 0.2, 1/2870)  # Up to one period of the Rabi oscillation
 T1 = np.linspace(1,40,200)
-tlist , result, T2 = SnV_ODMR.ram2(tau_range,MWvec,Bvec,Linewidth)#(tau_range,MWvec[3],Bvec, Evec, Linewidth)
+tlist , result, T2 = SnV_ODMR.hahn_echo(tau_range,MWvec,Bvec,Linewidth,t_points)#(tau_range,MWvec[3],Bvec, Evec, Linewidth)
 
-# probabilities = np.array([SnV_ODMR.ram2(tau, Bvec, Linewidth) for tau in tau_range])
+probabilities = result[1]
 
 # # Normalize probabilities
-# probabilities /= probabilities.max()
+probabilities /= probabilities.max()
 
 
 # # Assuming `tau_range` is your array of time points and `probabilities` is your oscillation data
-# peaks, _ = find_peaks(probabilities,prominence=0.01)
-# peak_times = tau_range[peaks]
-# peak_values = probabilities[peaks]
+peaks, _ = find_peaks(probabilities,prominence=0.01)
+peak_times = tau_range[peaks]
+peak_values = probabilities[peaks]
 
-# # Fit the exponential decay to the peaks
+# # # Fit the exponential decay to the peaks
 # params, _ = curve_fit(exp_decay, peak_times, peak_values, p0=[1, 1/(np.pi*Linewidth), 0.5])
 # print("T2 = ", params[1])
 # # Generate the envelope using the fitted parameters
@@ -80,30 +80,31 @@ tlist , result, T2 = SnV_ODMR.ram2(tau_range,MWvec,Bvec,Linewidth)#(tau_range,MW
 # peak_times = tau_range[peaks]
 # peak_values = result[1][peaks]
 
-# # Fit the exponential decay to the peaks
-# params, _ = curve_fit(exp_decay, peak_times, peak_values,p0=[1, T2, 0.5])
+# Fit the exponential decay to the peaks
+params, _ = curve_fit(exp_decay, peak_times, peak_values,p0=[1, T2, 0.5])
 
-# # Generate the envelope using the fitted parameters
-# envelope1 = exp_decay(tau_range, *params)
+# Generate the envelope using the fitted parameters
+envelope1 = exp_decay(tau_range, *params)
 
 
-# print("T2* = ",params[1])
+print("T2* = ",params[1])
 
 
 T2 = 1/(np.pi*Linewidth)
 plt.figure()
 plt.style.use("classic")
-plt.plot(tlist[:-1], result[1][:-1], '-', linewidth = 3, label="Ramsey signal") # result[1][:-1]
+# plt.plot(tlist, result[1], '-', linewidth = 3, label="Ramsey signal") # result[1][:-1]
 # plt.plot(tlist[:-1], (np.exp(-1./T2*tlist[:-1]))*0.5 + 0.5, color = "r",label="Exponential envelope (Ramsey)")
 # plt.plot(tlist[:-1], -np.exp(-1./T2*tlist[:-1])*0.5 +0.5, color = "r")
 # plt.plot(tau_range, probabilities, 'o-',linewidth = 1, label='Hahn Echo')
 # plt.plot(tau_range, envelope, 'y-', label='Exponential envelope (Hahn)')
-# plt.plot(tau_range, probabilities, 'o-',linewidth = 1, label='T1')
-# plt.plot(tau_range, envelope1, 'r-', label='Exponential envelope (Ramsey)')
-
+plt.plot(tau_range*1e9, probabilities, 'o-',linewidth = 2, label='Hahn Echo') 
+plt.plot(tau_range*1e9, envelope1, 'g-', label='Exponential envelope (Hahn)')
+plt.xlim(14.5, 300)
+plt.ylim(0, 1.1)
 plt.xscale('linear')
-plt.xlabel('Free evolution time $\\tau$ ($\\mu s$)')
-plt.ylabel('Population of |$0\\rangle$')
+plt.xlabel('Free evolution time $\\tau$ (ns)')
+plt.ylabel('Population of |$1\\rangle$')
 plt.legend()
 plt.show()
 

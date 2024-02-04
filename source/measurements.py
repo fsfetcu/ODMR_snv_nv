@@ -18,7 +18,7 @@ from qutip import Options
 import scipy.linalg as la
 from qutip.qip.operations import snot
 from qutip.qip.device import Processor
-from qutip.operators import sigmaz, destroy,sigmax, sigmay,sigmam, sigmap
+from qutip.operators import sigmaz, destroy,sigmax, sigmay,sigmam, sigmap, create
 from qutip.qip.operations import snot
 from qutip.states import basis
 
@@ -271,7 +271,7 @@ class pulsedODMR:
 
                     # print(freq_i-freq_j,"applied")
                     psi_i = resulti.states[-1]
-                    
+                    print(psi_i)
                 # Matrix element of the transition <j|Hint|i> = <j|psi_end>            
                 TME = (psi_j.dag()  * psi_i).data.toarray()[0,0]
                 TA = np.abs(TME)**2
@@ -361,7 +361,7 @@ class pulsedODMR:
 
 
     @staticmethod
-    def ram2(tau,MWvec,Bvec,Evec,Linewidth):
+    def ram2(tau,MWvec,Bvec,Evec,Linewidth,t_points):
         T2_star = 1 / (np.pi * Linewidth)  # T2 is in microseconds
         def choose_transition(a,b):
             """
@@ -382,12 +382,12 @@ class pulsedODMR:
         Hadamard = snot()
         a = destroy(2)
         e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard]
-        c_ops = [np.sqrt(1/(2*T2_star))*sigmaz(),sigmam() * np.sqrt(1/20)]
+        c_ops = [np.sqrt(1/(T2_star))*sigmaz(),sigmam() * np.sqrt(1/20)]
         superposition_state = (basis(2,0) - basis(2,1)).unit()
 
         # Evolve freely for time tau
         for t in tau:
-            result = mesolve(H_free, superposition_state, np.linspace(0, t, 300), c_ops = c_ops, e_ops= e_ops)
+            result = mesolve(H_free, superposition_state, np.linspace(0, t, t_points), c_ops = c_ops, e_ops= e_ops)
 
             # state = result.states[-1]
             # print(state)
@@ -400,53 +400,63 @@ class pulsedODMR:
                 
 
 
-    def hahn_echo(tau, MWvec, Linewidth):
+    def hahn_echo(tau, MWvec, Bvec,Evec, Linewidth,t_points):
         T2_star = 1 / (np.pi * Linewidth)  # T2 is in microseconds
-        resonant = 2870
+        def choose_transition(a,b):
+                """
+                Qubit frequency between two states. 
+                """
+                resonant = np.abs(eigenenergies[a] - eigenenergies[b])
+                return resonant
         # Eigenenergies and eigenvectors
         #simple hamiltonian
+        H_free = snvh.simpleFree(Bvec, Evec)
+        eigenenergies, eigenstates = snvh.simpleHamiltonEigen(Bvec, Evec)
         
-        Hint = sigmap() * 2.80319457
+        resonant = choose_transition(1,0)
         H_free = sigmaz()*resonant/2
         # Define the pi/2 pulse duration
-
-        Hint = snvh.simpleMWint(MWvec)
+        pi_pulse_duration = np.pi / (resonant)
+        Hint = ssnvh.simpleMWint(MWvec)
         
         Hadamard = snot()
         a = destroy(2)
-        e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard]
-        c_ops = [sigmam() * np.sqrt(1/(20*T2_star**2))]
+        e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard,sigmap(),sigmam()]
+        c_ops = [np.sqrt(1/(T2_star))*sigmaz(),sigmam() * np.sqrt(1/(10*T2_star))]
         superposition_state = (basis(2,0) - basis(2,1)).unit()
 
         # Evolve freely for time tau
         # result = mesolve(H_free, superposition_state, np.linspace(0, tau/2, 100), c_ops = [np.sqrt(1/(T2_star))*sigmaz()], e_ops= [])
         
         # result3 = mesolve(H_free, result.states[-1], np.linspace(0, tau/2 , 100), c_ops = c_ops, e_ops= e_ops)
-
-        result3 = mesolve(H_free, superposition_state, np.linspace(0, tau, 200), c_ops = c_ops, e_ops= e_ops)
-        return result3.expect[1][-1]
-
-
-    def relaxation(tau, T11, Linewidth):
-        for T1 in T11:
-            resonant = 2870
-            H_free = sigmaz()*resonant/2
-            # Define the pi/2 pulse duration
-
+        for t in tau:
+            result1 = mesolve(H_free, superposition_state, np.linspace(0, t/2, t_points), c_ops = c_ops, e_ops= e_ops)
+            new_state = (result1.expect[3][-1]*basis(2,0) + result1.expect[2][-1]*basis(2,1)).unit()
             
-            Hadamard = snot()
-            a = destroy(2)
-            e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard]
-            c_ops = [sigmam() * np.sqrt(1/(T1))]
-            superposition_state = (basis(2,0) - basis(2,1)).unit()
+            result1 = mesolve(H_free, new_state, np.linspace(0, t/2, t_points), c_ops = c_ops, e_ops= e_ops)
 
-            # Evolve freely for time tau
-            # result = mesolve(H_free, superposition_state, np.linspace(0, tau/2, 100), c_ops = [np.sqrt(1/(T2_star))*sigmaz()], e_ops= [])
-            
-            # result3 = mesolve(H_free, result.states[-1], np.linspace(0, tau/2 , 100), c_ops = c_ops, e_ops= e_ops)
+        return tau,result1.expect, T2_star       
 
-            result3 = mesolve(H_free, superposition_state, np.linspace(0, tau, 300), c_ops = c_ops, e_ops= e_ops)
-            return result3.expect[1][-1]
+    def relaxation(tau_range,MWvec,Bvec,Evec,Linewidth,t_points):
+        T1 = 1/(np.pi * Linewidth)  # T1 is in microseconds
+        resonant = 2870
+        H_free = sigmaz()*resonant/2
+        # Define the pi/2 pulse duration
+
+        
+        Hadamard = snot()
+        a = create(2)
+        e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard]
+        c_ops = [sigmam() * np.sqrt(1/(20*T1))]
+        superposition_state = (basis(2,0)).unit()
+
+        # Evolve freely for time tau
+        # result = mesolve(H_free, superposition_state, np.linspace(0, tau/2, 100), c_ops = [np.sqrt(1/(T2_star))*sigmaz()], e_ops= [])
+        
+        # result3 = mesolve(H_free, result.states[-1], np.linspace(0, tau/2 , 100), c_ops = c_ops, e_ops= e_ops)
+        for tau in tau_range:
+            result3 = mesolve(H_free, superposition_state, np.linspace(0, tau, t_points), c_ops = c_ops, e_ops= e_ops)
+        return tau_range,result3.expect,T1
 
     @staticmethod
     def ramsey_secq(tau_range, thetaMW, phiMW, B0, thetaB, phiB, E0, thetaE, phiE, Linewidth):
@@ -520,7 +530,51 @@ class SnV_ODMR():
     @staticmethod
     def NoisypulsedODMRsingleNV(MWfreq, MWvec, Bvec, Linewidth):
         return SnV_ODMR.singleSnVodmr(MWfreq, MWvec, Bvec, Linewidth) + noise.NoiseOf(SnV_ODMR.singleSnVodmr(MWfreq, MWvec, Bvec, Linewidth), 'gaussian', 0.02)
+    
+    def snv_pulsed2(MWfreq, MWvec, Bvec, Linewidth):
+        nMW = len(MWfreq)  # Number of microwave frequency points
+        Tstrength = np.zeros(nMW)  # Transition strength array
 
+        # Calculate eigenenergies and eigenstates
+        eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)
+
+        # Interaction Hamiltonian
+        Hint = ssnvh.simpleMWint(MWvec)
+
+        # Calculate π pulse duration based on the transition between the first two eigenstates
+        pi_pulse_duration = np.pi / (eigenenergies[1] - eigenenergies[0])
+
+        # Define the time-dependent coefficient function for the pulse
+        def pulse_coeff(t, args):
+            return 1 if 0 <= t <= pi_pulse_duration else 0
+
+        # Define the Hamiltonian for the pulse
+        H_pulse = [Hint, pulse_coeff]
+
+        for i in range(4):  # Sweep over all states
+            for j in range(4):
+                if i != j:
+                    # Transition frequency
+                    transition_freq = np.abs(eigenenergies[j] - eigenenergies[i])
+
+                    # Find indices where MW frequency is resonant with the transition within the linewidth
+                    resonant_indices = np.where(np.abs(MWfreq - transition_freq) <= Linewidth)[0]
+
+                    # Apply π-pulse only if there is resonance
+                    if len(resonant_indices) > 0:
+                        # Simulate the system under the pulse
+                        resulti = mesolve(H_pulse, eigenstates[i], np.linspace(0, np.pi/np.abs((transition_freq)), 300), [], [])
+                        psi_i = resulti.states[-1]
+
+                        # Calculate the transition matrix element at resonant frequencies
+                        TME = (eigenstates[j].dag() * psi_i).data.toarray()[0,0]
+                        TA = np.abs(TME)**2
+
+                        # Update the transition strength only at the resonant frequencies
+                        for idx in resonant_indices:
+                            Tstrength[idx] += TA * math_functions.lorentzian(MWfreq[idx], transition_freq, Linewidth)
+
+        return Tstrength
     @staticmethod
     def snv_pulsed(MWfreq, MWvec, Bvec, Linewidth):
                 
@@ -529,7 +583,6 @@ class SnV_ODMR():
         SX = tensor(ssnvh.I,ssnvh.sigma_x)
         # Eigenenergies and eigenvectors
 
-        operator = (-1j * np.pi * SX).expm()
         H_free = ssnvh.H_total(Bvec)
         eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)  # Eigenenergies and eigenvectors
         print(eigenenergies)
@@ -549,6 +602,7 @@ class SnV_ODMR():
         
         H_pulse = [Hint, pulse_coeff]
         print(eigenenergies[1]-eigenenergies[0])
+        
         for i in [0,1,2,3]:  # Sweep over all initial states
             freq_i = eigenenergies[i]
             psi_i = eigenstates[i]
@@ -557,32 +611,31 @@ class SnV_ODMR():
                 freq_j = eigenenergies[j]  
                 psi_j = eigenstates[j]  
                 if i!=j:
+                    
                     if np.abs(freq_j - freq_i) == np.abs(eigenenergies[1]-eigenenergies[0]):
                         print(psi_i)
-                        resulti = mesolve(H_pulse, psi_i, np.linspace(0, pi_pulse_duration, 100), [], [])
-                        # print(resulti.states[-1])
+                        resulti = mesolve(H_pulse, psi_j, np.linspace(0, pi_pulse_duration, 300), [], [])
+                        print(resulti.states[-1])
                         # print(SX * psi_i)
                         # print(SX*psi_i == resulti.states[-1])
                         print(freq_i-freq_j,"applied")
-                        psi_i = resulti.states[-1]
-                        print(psi_i)
-                        
-                        
-                        # Matrix element of the transition <j|Hint|i> = <j|psi_end>            
-                        TME = (psi_j.dag() * psi_i).data.toarray()[0,0]
+                        # psi_j = resulti.states[-1]
+                        # print(psi_i == psi_x) 
+                    # Matrix element of the transition <j|Hint|i> = <j|psi_end>   
+                                
+                        TME = (psi_j.dag() * resulti.states[-1]).data.toarray()[0,0]
+                        TA = np.abs(TME)**2
+                        TS = TA *math_functions.lorentzian(MWfreq, ((freq_j - freq_i)), Linewidth)
+                        Tstrength += TS
+                    else: 
+                        TME = (psi_j.dag()* psi_i).data.toarray()[0,0]
                         TA = np.abs(TME)**2
                         TS = TA *math_functions.lorentzian(MWfreq, (freq_j - freq_i), Linewidth)
                         Tstrength += TS
-                        
-                    else:
-                        # Matrix element of the transition <j|Hint|i> = <j|psi_end>            
-                        TME = (psi_j.dag() *Hint * psi_i).data.toarray()[0,0]
-                        TA = np.abs(TME)**2
-                        TS = TA *math_functions.lorentzian(MWfreq, (freq_j - freq_i), Linewidth)
-                        Tstrength += TS
+                
         return Tstrength
 
-    def ram2(tau,MWvec,Bvec,Linewidth):
+    def ram2(tau,MWvec,Bvec,Linewidth,t_points):
             T2_star = 1 / (np.pi * Linewidth)  # T2 is in microseconds
             def choose_transition(a,b):
                 """
@@ -594,10 +647,10 @@ class SnV_ODMR():
             #simple hamiltonian
             H_free = ssnvh.H_total(Bvec)
             eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)
-            print(eigenenergies[2]-eigenenergies[1])
+            
             resonant = choose_transition(1,0)
             # states = Qobj(H_free[1:3, 1:3]).eigenstates()
-            print(resonant)
+            print(resonant/1e9)
             H_free = sigmaz()*resonant/2
             print(H_free)
             # Define the pi/2 pulse duration
@@ -605,13 +658,13 @@ class SnV_ODMR():
             Hadamard = snot()
             a = destroy(2)
             e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard]
-            c_ops = [np.sqrt(1/(T2_star))*sigmaz()]
+            c_ops = [np.sqrt(1/(T2_star))*sigmaz(),sigmam() * np.sqrt(1/(10*T2_star))]#[np.sqrt(1/(T2_star))*sigmaz()]
             superposition_state = (basis(2,0) - basis(2,1)).unit() # pi/2 of |0>
 
             # Evolve freely for time tau
             
             for t in tau:
-                result = mesolve(H_free, superposition_state, np.linspace(0, t, 50), c_ops = c_ops, e_ops= e_ops)
+                result = mesolve(H_free, superposition_state, np.linspace(0, t, t_points), c_ops = c_ops, e_ops= e_ops)
 
                 # state = result.states[-1]
                 # print(state)
@@ -621,3 +674,69 @@ class SnV_ODMR():
                 # state = sigmax() * state_after_echo
                 # result = mesolve(H_free, superposition_state, np.linspace(0, t, 50), c_ops = [np.sqrt(1/T2_star)*sigmax()], e_ops= e_ops)
             return tau,result.expect,T2_star
+
+    def hahn_echo(tau, MWvec, Bvec, Linewidth,t_points):
+        T2_star = 1 / (np.pi * Linewidth)  # T2 is in microseconds
+        def choose_transition(a,b):
+                """
+                Qubit frequency between two states. 
+                """
+                resonant = np.abs(eigenenergies[a] - eigenenergies[b])
+                return resonant
+        # Eigenenergies and eigenvectors
+        #simple hamiltonian
+        H_free = ssnvh.H_total(Bvec)
+        eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)
+        
+        resonant = choose_transition(1,0)
+        print(resonant)
+        H_free = sigmaz()*resonant/2
+        # Define the pi/2 pulse duration
+        pi_pulse_duration = np.pi / (resonant)
+        Hint = ssnvh.simpleMWint(MWvec)
+        
+        Hadamard = snot()
+        a = destroy(2)
+        e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard,sigmap(),sigmam()]
+        c_ops = [np.sqrt(1/(T2_star))*sigmaz(),sigmam() * np.sqrt(1/(10*T2_star))]
+        superposition_state = (basis(2,0) - basis(2,1)).unit()
+
+        # Evolve freely for time tau
+        # result = mesolve(H_free, superposition_state, np.linspace(0, tau/2, 100), c_ops = [np.sqrt(1/(T2_star))*sigmaz()], e_ops= [])
+        
+        # result3 = mesolve(H_free, result.states[-1], np.linspace(0, tau/2 , 100), c_ops = c_ops, e_ops= e_ops)
+        for t in tau:
+            result1 = mesolve(H_free, superposition_state, np.linspace(0, t/2, t_points), c_ops = c_ops, e_ops= e_ops)
+            new_state = (result1.expect[3][-1]*basis(2,0) + result1.expect[2][-1]*basis(2,1)).unit()
+            
+            result1 = mesolve(H_free, new_state, np.linspace(0, t/2, t_points), c_ops = c_ops, e_ops= e_ops)
+
+        return tau,result1.expect, T2_star       
+
+    def relaxation(tau_range,MWvec,Bvec,Linewidth,t_points):
+        T1 = 1/(np.pi * Linewidth)  # T1 is in microseconds
+        def choose_transition(a,b):
+                """
+                Qubit frequency between two states. 
+                """
+                resonant = np.abs(eigenenergies[a] - eigenenergies[b])
+                return resonant
+        eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)
+        resonant = choose_transition(1,0)
+        H_free = sigmaz()*resonant/2
+        # Define the pi/2 pulse duration
+
+        
+        Hadamard = snot()
+        a = create(2)
+        e_ops=[a.dag()*a, Hadamard*a.dag()*a*Hadamard]
+        c_ops = [sigmam() * np.sqrt(1/(20*T1))]
+        superposition_state = (basis(2,0)).unit()
+
+        # Evolve freely for time tau
+        # result = mesolve(H_free, superposition_state, np.linspace(0, tau/2, 100), c_ops = [np.sqrt(1/(T2_star))*sigmaz()], e_ops= [])
+        
+        # result3 = mesolve(H_free, result.states[-1], np.linspace(0, tau/2 , 100), c_ops = c_ops, e_ops= e_ops)
+        for tau in tau_range:
+            result3 = mesolve(H_free, superposition_state, np.linspace(0, tau, t_points), c_ops = c_ops, e_ops= e_ops)
+        return tau_range,result3.expect,T1
