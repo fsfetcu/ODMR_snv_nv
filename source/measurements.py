@@ -506,7 +506,7 @@ class SnV_ODMR():
 
         eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)  # Eigenenergies and eigenvectors
         Hint = ssnvh.simpleMWint(MWvec)  # Interaction Hamiltonian
-        print(eigenenergies)
+        # print(eigenenergies)
         # Calculate transition strengths
         for i in [0,1,2,3]:  # Sweep over all initial states
             freq_i = eigenenergies[i]  
@@ -523,6 +523,127 @@ class SnV_ODMR():
 
                     TS = TA * math_functions.lorentzian(MWfreq, (freq_j - freq_i), Linewidth)
                     
+                    Tstrength += TS
+
+        return Tstrength
+
+    def singleSnVodmr_L(MWfreq, MWvec, Bvec, Gamma_0,T):
+        """
+        Returns ESR transition strengths for a single SnV center.
+
+        Parameters
+        ----------
+        MWfreq : numpy.ndarray
+            Array of frequencies.
+        MWvec : qt.Qobj
+            Vector of the microwave field defined in SnV frame.
+        Bvec : qt.Qobj
+            Vector of the magnetic field defined in SnV frame.
+        Linewidth : float   
+            Linewidth of the transition (depends on experimental setup).
+        
+        Returns
+        -------
+        numpy.ndarray
+            Transition strengths.
+        """
+        Debye = 28.8e13  # Hz
+        hbar = 1.0545718e-34  # J*s
+        k_b = 1.380649e-23  # J/K
+        c = 299792458  # m/s
+        omega_0 = 1332.7 * c * 100#32.1 * 1.60218e-19 / hbar * 1e-3  # Convert from meV to Hz
+        Gamma_0 = 50e6  # Linewidth at T=0, in Hz
+        # print(omega_0)
+        
+        def gamma(T):
+            return Gamma_0 *(1+2/(np.exp(hbar*omega_0/(k_b*T))-1))
+
+        Linewidth = gamma(T)
+
+        nMW = len(MWfreq)  
+        Tstrength = np.zeros(nMW)  
+
+        eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)  # Eigenenergies and eigenvectors
+        Hint = ssnvh.simpleMWint(MWvec)  # Interaction Hamiltonian
+        # print(eigenenergies)
+        # Calculate transition strengths
+        for i in [0,1,2,3]:  # Sweep over all initial states
+            freq_i = eigenenergies[i]  
+            psi_i = eigenstates[i]
+
+            for j in range(4):  
+                freq_j = eigenenergies[j]  
+                psi_j = eigenstates[j]  
+
+                if i!= j:
+                    # Transition matrix element and transition amplitude calculation <j|Hint|i>
+                    TME = (psi_j.dag() *Hint* psi_i).data.toarray()[0,0]
+                    TA = np.abs(TME)**2
+
+                    TS = TA * math_functions.lorentzian(MWfreq, (freq_j - freq_i), Linewidth)
+                    
+                    Tstrength += TS
+
+        return Tstrength
+
+
+    def singleSnVodmr_T(MWfreq, MWvec, Bvec,Linewidth,alpha):
+        """
+        Returns ESR transition strengths for a single SnV center.
+
+        Parameters
+        ----------
+        MWfreq : numpy.ndarray
+            Array of frequencies.
+        MWvec : qt.Qobj
+            Vector of the microwave field defined in SnV frame.
+        Bvec : qt.Qobj
+            Vector of the magnetic field defined in SnV frame.
+        Linewidth : float   
+            Linewidth of the transition (depends on experimental setup).
+        
+        Returns
+        -------
+        numpy.ndarray
+            Transition strengths.
+        """
+        Debye = 28.8e13  # Hz
+        hbar = 1.0545718e-34  # J*s
+        k_b = 1.380649e-23  # J/K
+        c = 299792458  # m/s
+        omega_0 = 1332.7 * c * 100#32.1 * 1.60218e-19 / hbar * 1e-3  # Convert from meV to Hz
+
+
+        nMW = len(MWfreq)  
+        Tstrength = np.zeros(nMW)  
+
+        
+
+        
+        eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates_T(Bvec,alpha)
+        freq, _ = ssnvh.SNV_eigenEnergiesStates(Bvec)  # Eigenenergies and eigenvectors
+
+        print(freq == eigenenergies)
+        Hint = ssnvh.simpleMWint(MWvec)  # Interaction Hamiltonian
+        # print(eigenenergies)
+        # Calculate transition strengths
+        m = 0 
+        for i in [0,1,2,3]:  # Sweep over all initial states
+            freq_i = eigenenergies[i]  
+            psi_i = eigenstates[i]
+            freq_x = freq[i]
+            for j in range(4):  
+                freq_j = eigenenergies[j]  
+                psi_j = eigenstates[j]  
+                freq_y = freq[j]
+                if i!= j:
+                    # Transition matrix element and transition amplitude calculation <j|Hint|i>
+                    TME = (psi_j.dag() *Hint* psi_i).data.toarray()[0,0]
+                    TA = np.abs(TME)**2
+                    
+                    # X = alpha[0] * alpha[1]*3
+                    # Linewidth = Linewidth + (1-np.exp(beta * X))
+                    TS = TA * math_functions.lorentzian(MWfreq, np.abs((freq_y - freq_j)) , Linewidth)
                     Tstrength += TS
 
         return Tstrength

@@ -321,6 +321,18 @@ class SingleSnVHamiltonian:
         """
         H_JT = Qobj([[Upsilon_x, Upsilon_y], [Upsilon_y, -Upsilon_x]])
         return tensor(H_JT, SingleSnVHamiltonian.I)
+    
+    @staticmethod
+    def H_SO_T(alpha):
+        """
+        Spin-orbit coupling Hamiltonian for SnV center with temperature dependency.
+
+        Returns:
+            Qobj: Spin-orbit coupling Hamiltonian.
+        """
+        # print(alpha[1])
+        # X = alpha[0] * alpha[1]**3
+        return (SingleSnVHamiltonian.lambda_SO - alpha) / 2 * tensor(SingleSnVHamiltonian.sigma_y, SingleSnVHamiltonian.sigma_z)
 
     @staticmethod
     def H_total(B):
@@ -335,9 +347,28 @@ class SingleSnVHamiltonian:
             Qobj: Total Hamiltonian.
         """
         return SingleSnVHamiltonian.H_SO() + SingleSnVHamiltonian.H_Z(B) + SingleSnVHamiltonian.H_JT(SingleSnVHamiltonian.Upsilon_x,SingleSnVHamiltonian.Upsilon_y) + SingleSnVHamiltonian.H_L(B)
+
+    def H_total_T(B,alpha):
+        """
+        Total Hamiltonian for SnV center.
+
+        Parameters:
+            B (np.ndarray): Magnetic field vector [Bx, By, Bz].
+            Upsilon_x, Upsilon_y (float): Coupling constants for Jahn-Teller effect.
+
+        Returns:
+            Qobj: Total Hamiltonian.
+        """
+        return SingleSnVHamiltonian.H_SO_T(alpha) + SingleSnVHamiltonian.H_Z(B) + SingleSnVHamiltonian.H_JT(SingleSnVHamiltonian.Upsilon_x,SingleSnVHamiltonian.Upsilon_y) + SingleSnVHamiltonian.H_L(B)
     
     def SNV_eigenEnergiesStates(B):
         H_total = SingleSnVHamiltonian.H_total(B)
+        E_I, vec_I = H_total.eigenstates()
+
+        return E_I, vec_I
+    
+    def SNV_eigenEnergiesStates_T(B,alpha):
+        H_total = SingleSnVHamiltonian.H_total_T(B,alpha)
         E_I, vec_I = H_total.eigenstates()
 
         return E_I, vec_I
