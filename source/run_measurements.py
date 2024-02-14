@@ -15,14 +15,14 @@ import matplotlib.pyplot as plt
 
 #constants
 MW_freq_range = np.linspace(2820, 2920, 1000)  # Adjust range and points as needed
-B0 = 10 # Magnetic field strength in G
+B0 = 0 # Magnetic field strength in G
 thetaB, phiB = np.pi, np.pi/2  # Direction of the magnetic field in spherical coordinates
-E0 = 0  # Electric field strength (assuming no electric field for simplicity)
+E0 = 0.1e7  # Electric field strength (assuming no electric field for simplicity)
 thetaE, phiE = np.pi/4, np.pi/2  # Direction of the electric field (not relevant here)
 
 # Define MW field parameters (assuming it's perpendicular to the NV axis)
 thetaMW, phiMW = 0, np.pi/2 # Direction of MW field
-Linewidth = 2.5 # Linewidth of the transitions (in MHz)
+Linewidth = 1 # Linewidth of the transitions (in MHz)
 
 Bvec = vec.getAllframesCartesian(B0, thetaB, phiB)[0]
 Evec = vec.getAllframesCartesian(E0, thetaE, phiE)[0]
@@ -32,7 +32,7 @@ cw_odmrDATA = cwODMR.ODMRsingleNV(MW_freq_range,MWvec, Bvec, Evec, Linewidth)
 pulsed_odmrDATA = pulsedODMR.pulsedODMRsingleNV(MW_freq_range,MWvec, Bvec, Evec, Linewidth)
 
 
-simulation = [cw_odmrDATA, pulsed_odmrDATA]#, nvODMR_lock_inDATA, pulsed_odmr_lock_inDATA]
+simulation = [cw_odmrDATA]#, pulsed_odmrDATA]#, nvODMR_lock_inDATA, pulsed_odmr_lock_inDATA]
 # plotting.plot_ODMR(MW_freq_range, simulation)
 l = ["cw", "pulsed"]
 plt.figure()

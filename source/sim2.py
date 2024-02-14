@@ -105,4 +105,37 @@ def bd():
     plt.ylabel('Qubit Frequency (Hz)')
     plt.show()
 
-oned()
+def strain():
+    
+
+
+    # 2d plot, qubit freq vs strain and phi
+
+    # Constants
+    B_magnitude = 0.1  # Replace with the actual magnitude of the magnetic field
+    strain_values = np.linspace(0, 300e9, 100)  # Strain values to explore
+    phi_values = np.linspace(0, 2*np.pi, 100)  # Azimuthal angle from 0 to 2pi
+
+    # Calculate qubit frequency for each (phi, strain)
+    qubit_freqs = np.zeros((len(strain_values), len(phi_values)))
+    for i, strain in enumerate(strain_values):
+        for j, phi in enumerate(phi_values):
+            # Calculate eigenenergies
+            B = vec.getAllframesCartesian(B_magnitude, np.pi/2, phi)[0]
+            E_I, _ = SingleSnVHamiltonian.SNV_eigenEnergiesStates_strain(B, strain)
+            
+            # Assuming the qubit frequency is the difference between the first two eigenenergies
+            qubit_freq = E_I[1] - E_I[0]
+            qubit_freqs[i, j] = qubit_freq
+
+            print(i,j)
+    # Create the 2D plot
+    plt.figure(figsize=(10, 5))
+    plt.style.use("classic")
+    phi_grid, strain_grid = np.meshgrid(phi_values, strain_values)
+    plt.contourf(phi_grid, strain_grid, qubit_freqs, 100, cmap='viridis')
+    plt.colorbar(label='Qubit Frequency (Hz)')
+    plt.xlabel('$\\phi_{MW}$ (rad)')
+    plt.ylabel('Ground strain (Hz)')
+    plt.show()
+strain()

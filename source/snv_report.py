@@ -32,15 +32,15 @@ def calculate_fwhm(data, frequency):
 
 # Constants
 MW_freq_range = np.linspace(-1e9, 1e9, 2000)  # Frequency range for ODMR sweep
-B0 = 0.01 # Magnetic field strength in Tesla
-thetaB, phiB = np.pi, np.pi  # Direction of the magnetic field in spherical coordinates
-Linewidth = 30e6  # Linewidth of the transitions (in Hz)
+B0 = 0.001 # Magnetic field strength in Tesla
+thetaB, phiB = np.pi/2, 0  # Direction of the magnetic field in spherical coordinates
+Linewidth = 10e6  # Linewidth of the transitions (in Hz)
 #
 
 Bvec = vec.getAllframesCartesian(B0, thetaB, phiB)[0]
 
 eigenenergies, eigenstates = ssnvh.SNV_eigenEnergiesStates(Bvec)
-print(ssnvh.gamma_e * (eigenenergies[1] - eigenenergies[0]))
+print( (eigenenergies[1] - eigenenergies[0])/1e9) # 1/(2*ssnvh.gamma_e) *
 
 # Define MW field vectors, perpendicular to B-field for simplicity
 # You might use x or y polarization depending on your system setup; here we'll use x-polarization for illustration.
@@ -53,7 +53,7 @@ snV_ODMR_spectrum1 = SnV_ODMR.snv_pulsed(MW_freq_range, MWvec,Bvec, Linewidth)
 cw_odmr_area = simps(snV_ODMR_spectrum, MW_freq_range)
 pulsed_odmr_area = simps(snV_ODMR_spectrum1, MW_freq_range)
 
-# snV_ODMR_spectrum2 = SnV_ODMR.snv_pulsed2(MW_freq_range, MWvec,Bvec, Linewidth)
+snV_ODMR_spectrum2 = SnV_ODMR.snv_pulsed2(MW_freq_range, MWvec,Bvec, Linewidth)
 # print(max(snV_ODMR_spectrum))
 # print(max(snV_ODMR_spectrum1))
 # Plotting
@@ -63,7 +63,7 @@ plt.rcParams.update({'font.size': 22})
 plt.style.use("classic")
 plt.plot(MW_freq_range / 1e6, snV_ODMR_spectrum/max(snV_ODMR_spectrum), label="cw")
 # plt.plot(MW_freq_range / 1e6, snV_ODMR_spectrum1/max(snV_ODMR_spectrum1), label="pulsed")
-# plt.plot(MW_freq_range / 1e6, snV_ODMR_spectrum2, label="pulsed")
+plt.plot(MW_freq_range / 1e6, snV_ODMR_spectrum2/max(snV_ODMR_spectrum2), label="pulsed")
 plt.xlabel('$\\Delta \\omega$ (MHZ)')
 plt.ylabel('Fluoresence (Arbitrary Units)')
 plt.legend()

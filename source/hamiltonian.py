@@ -395,3 +395,22 @@ class SingleSnVHamiltonian:
         return tensor(SingleSnVHamiltonian.I,H_zeeman)
         return HintEl
 
+    def H_strain(B,upsilon):
+        """
+        Total Hamiltonian for SnV center.
+
+        Parameters:
+            B (np.ndarray): Magnetic field vector [Bx, By, Bz].
+            Upsilon_x, Upsilon_y (float): Coupling constants for Jahn-Teller effect.
+
+        Returns:
+            Qobj: Total Hamiltonian.
+        """
+        return SingleSnVHamiltonian.H_SO() + SingleSnVHamiltonian.H_Z(B) + SingleSnVHamiltonian.H_JT(np.sqrt(2)*upsilon,np.sqrt(2)*upsilon) + SingleSnVHamiltonian.H_L(B)
+
+   
+    def SNV_eigenEnergiesStates_strain(B,upsilon):
+        H_total = SingleSnVHamiltonian.H_strain(B,upsilon)
+        E_I, vec_I = H_total.eigenstates()
+
+        return E_I, vec_I
